@@ -1,6 +1,12 @@
 pipeline {
     agent any
 
+    environment {
+        DOCKER_IMAGE = 'randheeer/green-app'
+        DOCKER_TAG = '2.0'
+        APP_SERVER = '13.232.31.26'
+    }
+
     stages {
 
         stage('Checkout') {
@@ -24,17 +30,75 @@ pipeline {
             steps {
                 echo 'Building Green Docker image'
 
-                sh 'docker build -t green-app:2.0 .'
+                sh '''
+                    docker build \
+                    -t ${DOCKER_IMAGE}:${DOCKER_TAG} \
+                    .
+                '''
             }
         }
 
-        stage('Test SSH Connection') {
+        stage('Docker Login & Push') {
             steps {
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
+
+                    sh '''
+                        echo "$DOCKER_PASSWORD" | docker login \
+                        -u "$DOCKER_USERNAME" \
+                        --password-stdin
+
+                        docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+
+                        docker logout
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy GREEN') {
+            steps {
+
                 sshagent(['app-server-ssh']) {
+
                     sh '''
                         ssh -o StrictHostKeyChecking=no \
-                        ubuntu@13.232.31.26 \
-                        "hostname"
+                        ubuntu@${APP_SERVER} \
+                        "
+                        docker pull ${DOCKER_IMAGE}:${DOCKER_TAG}
+
+                        docker stop green-app || true
+
+                        docker rm green-app || true
+
+                        docker run -d \
+                        --name green-app \
+                        -p 80:80 \
+                        ${DOCKER_IMAGE}:${DOCKER_TAG}
+                        "
+                    '''
+                }
+            }
+        }
+
+        stage('GREEN Health Check') {
+            steps {
+
+                sshagent(['app-server-ssh']) {
+
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no \
+                        ubuntu@${APP_SERVER} \
+                        "
+                        sleep 5
+                        curl -f http://localhost
+                        "
                     '''
                 }
             }
@@ -42,12 +106,13 @@ pipeline {
     }
 
     post {
+
         success {
-            echo 'Pipeline completed successfully'
+            echo 'GREEN deployment completed successfully'
         }
 
         failure {
-            echo 'Pipeline failed'
+            echo 'GREEN deployment failed'
         }
     }
 }
