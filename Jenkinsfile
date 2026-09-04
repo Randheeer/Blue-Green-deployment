@@ -19,15 +19,24 @@ pipeline {
                 sh 'cat Dockerfile'
             }
         }
+
+        stage('Docker Build') {
+            steps {
+                echo 'Building Green Docker image'
+
+                sh 'docker build -t green-app:2.0 .'
+            }
+        }
+
     }
 
     post {
         success {
-            echo 'Green application verification successful'
+            echo 'Green Docker image built successfully'
         }
 
         failure {
-            echo 'Green application verification failed'
+            echo 'Pipeline failed'
         }
     }
 }
