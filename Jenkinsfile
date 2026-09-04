@@ -30,10 +30,10 @@ pipeline {
 
         stage('Test SSH Connection') {
             steps {
-                sshagent(['app-ec2-ssh']) {
+                sshagent(['app-server-ssh']) {
                     sh '''
                         ssh -o StrictHostKeyChecking=no \
-                        ubuntu@YOUR_APP_EC2_PUBLIC_IP \
+                        ubuntu@13.232.31.26 \
                         "hostname"
                     '''
                 }
