@@ -28,11 +28,22 @@ pipeline {
             }
         }
 
+        stage('Test SSH Connection') {
+            steps {
+                sshagent(['app-ec2-ssh']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no \
+                        ubuntu@YOUR_APP_EC2_PUBLIC_IP \
+                        "hostname"
+                    '''
+                }
+            }
+        }
     }
 
     post {
         success {
-            echo 'Green Docker image built successfully'
+            echo 'Pipeline completed successfully'
         }
 
         failure {
