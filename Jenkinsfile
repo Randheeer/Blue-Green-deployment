@@ -4,7 +4,7 @@ pipeline {
     environment {
         DOCKER_IMAGE = 'randheeer/green-app'
         DOCKER_TAG = '2.0'
-        APP_SERVER = '13.232.31.26'
+        APP_SERVER = '65.0.153.17'
     }
 
     stages {
@@ -78,6 +78,7 @@ pipeline {
                         docker rm green-app || true
 
                         docker run -d \
+			--restart unless-stopped \
                         --name green-app \
                         -p 80:80 \
                         ${DOCKER_IMAGE}:${DOCKER_TAG}
