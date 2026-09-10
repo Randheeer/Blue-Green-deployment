@@ -5,6 +5,7 @@ pipeline {
         DOCKER_IMAGE = 'randheeer/green-app'
         DOCKER_TAG = '2.0'
         APP_SERVER = '65.0.153.17'
+        SBOM_FILE = 'green-app-sbom.json'
     }
 
     stages {
@@ -34,6 +35,32 @@ pipeline {
                     docker build \
                     -t ${DOCKER_IMAGE}:${DOCKER_TAG} \
                     .
+                '''
+            }
+        }
+
+        stage('Trivy Vulnerability Scan') {
+            steps {
+                echo 'Scanning Docker image with Trivy'
+
+                sh '''
+                    trivy image \
+                    --severity HIGH,CRITICAL \
+                    --exit-code 1 \
+                    ${DOCKER_IMAGE}:${DOCKER_TAG}
+                '''
+            }
+        }
+
+        stage('Generate SBOM') {
+            steps {
+                echo 'Generating CycloneDX SBOM'
+
+                sh '''
+                    trivy image \
+                    --format cyclonedx \
+                    --output ${SBOM_FILE} \
+                    ${DOCKER_IMAGE}:${DOCKER_TAG}
                 '''
             }
         }
@@ -78,7 +105,7 @@ pipeline {
                         docker rm green-app || true
 
                         docker run -d \
-			--restart unless-stopped \
+                        --restart unless-stopped \
                         --name green-app \
                         -p 80:80 \
                         ${DOCKER_IMAGE}:${DOCKER_TAG}
@@ -108,12 +135,17 @@ pipeline {
 
     post {
 
+        always {
+            archiveArtifacts artifacts: 'green-app-sbom.json',
+                         allowEmptyArchive: true
+        }
+
         success {
             echo 'GREEN deployment completed successfully'
         }
 
         failure {
-            echo 'GREEN deployment failed'
+            echo 'GREEN deployment failed - Security Gate or another pipeline stage failed'
         }
     }
 }
